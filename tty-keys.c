@@ -60,6 +60,8 @@ static int	tty_keys_device_attributes2(struct tty *, const char *, size_t,
 static int	tty_keys_extended_device_attributes(struct tty *, const char *,
 		    size_t, size_t *);
 static int	tty_keys_palette(struct tty *, const char *, size_t, size_t *);
+static int	tty_keys_broken_colours(struct tty *, const char *, size_t,
+		    size_t *, int *, int *);
 
 /* A key tree entry. */
 struct tty_key {
@@ -794,6 +796,20 @@ tty_keys_next(struct tty *tty)
 
 	/* Is this a colours response? */
 	switch (tty_keys_colours(tty, buf, len, &size, &tty->fg, &tty->bg)) {
+	case 0:		/* yes */
+		key = KEYC_UNKNOWN;
+		session_theme_changed(c->session);
+		goto complete_key;
+	case -1:	/* no, or not valid */
+		break;
+	case 1:		/* partial */
+		session_theme_changed(c->session);
+		goto partial_key;
+	}
+
+	/* Is this a broken colours response (missing ESC/ST)? */
+	switch (tty_keys_broken_colours(tty, buf, len, &size, &tty->fg,
+	    &tty->bg)) {
 	case 0:		/* yes */
 		key = KEYC_UNKNOWN;
 		session_theme_changed(c->session);
@@ -1772,6 +1788,111 @@ tty_keys_palette(struct tty *tty, const char *buf, size_t len, size_t *size)
 		return (0);
 	pd.idx = idx;
 	input_request_reply(c, INPUT_REQUEST_PALETTE, &pd);
+
+	return (0);
+}
+
+/*
+ * Handle colour responses that arrive without a leading ESC or without the
+ * usual ST terminator. This works around terminals (notably Windows ConPTY)
+ * that leak OSC 10/11/12 replies into the input stream stripped of
+ * delimiters. Returns 0 for success, -1 for failure, 1 for partial.
+ */
+static int
+tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
+    size_t *size, int *fg, int *bg)
+{
+	struct client	*c = tty->client;
+	size_t		 i, start, payload;
+	char		 tmp[128];
+	int		 target = -1, n;
+	int		 waiting = tty->flags & (TTY_WAITFG|TTY_WAITBG);
+
+	*size = 0;
+
+	/* Only attempt to consume replies we actually requested. */
+	if (!waiting)
+		return (-1);
+
+	/* Optional leading ESC. */
+	if (buf[0] == '\033') {
+		if (len == 1)
+			return (1);
+		if (buf[1] != ']')
+			return (-1);
+		start = 2;
+	} else if (buf[0] == ']') {
+		start = 1;
+	} else
+		return (-1);
+
+	/* Need "1" then "0/1/2" then ";". */
+	if (len <= start)
+		return (1);
+	if (buf[start] != '1')
+		return (-1);
+	if (len <= start + 1)
+		return (1);
+	if (buf[start + 1] == '0')
+		target = 0;
+	else if (buf[start + 1] == '1')
+		target = 1;
+	else if (buf[start + 1] == '2')
+		target = 2;
+	else
+		return (-1);
+	if (len <= start + 2)
+		return (1);
+	if (buf[start + 2] != ';')
+		return (-1);
+
+	payload = start + 3;
+
+	/* Find a terminator: BEL, bare backslash, CR, or LF. */
+	for (i = payload; i < len && i - payload < sizeof tmp; i++) {
+		if (buf[i] == '\007' || buf[i] == '\\' ||
+		    buf[i] == '\r' || buf[i] == '\n')
+			break;
+	}
+	if (i == len)	/* need more data */
+		return (1);
+	if (i == payload) /* empty colour */
+		return (-1);
+
+	memcpy(tmp, buf + payload, i - payload);
+	tmp[i - payload] = '\0';
+	*size = i + 1;
+
+	n = colour_parseX11(tmp);
+	if (n == -1)
+		return (-1);
+
+	if (target == 0 && (tty->flags & TTY_WAITFG)) {
+		if (c != NULL)
+			log_debug("%s fg (broken reply) is %s", c->name,
+			    colour_tostring(n));
+		else
+			log_debug("fg (broken reply) is %s",
+			    colour_tostring(n));
+		*fg = n;
+		tty->flags &= ~TTY_WAITFG;
+	} else if (target == 1 && (tty->flags & TTY_WAITBG)) {
+		if (c != NULL)
+			log_debug("%s bg (broken reply) is %s", c->name,
+			    colour_tostring(n));
+		else
+			log_debug("bg (broken reply) is %s",
+			    colour_tostring(n));
+		*bg = n;
+		tty->flags &= ~TTY_WAITBG;
+	} else {
+		/*
+		 * Either a cursor colour (12) or a reply we were no longer
+		 * waiting for; swallow to avoid leaking into panes.
+		 */
+		log_debug("%s: swallowing unexpected colour reply %s",
+		    c != NULL ? c->name : __func__, tmp);
+	}
 
 	return (0);
 }
