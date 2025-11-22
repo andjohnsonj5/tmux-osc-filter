@@ -1429,12 +1429,11 @@ tty_keys_device_attributes(struct tty *tty, const char *buf, size_t len,
 {
 	struct client	*c = tty->client;
 	int		*features = &c->term_features;
+	int		 have = tty->flags & TTY_HAVEDA;
 	u_int		 i, n = 0;
 	char		 tmp[128], *endptr, p[32] = { 0 }, *cp, *next;
 
 	*size = 0;
-	if (tty->flags & TTY_HAVEDA)
-		return (-1);
 
 	/* First three bytes are always \033[?. */
 	if (buf[0] != '\033')
@@ -1475,6 +1474,13 @@ tty_keys_device_attributes(struct tty *tty, const char *buf, size_t len,
 			break;
 	}
 
+	/* If we already handled DA, swallow repeats to avoid leaking. */
+	if (have) {
+		log_debug("%s: ignoring repeated primary DA %.*s", c->name,
+		    (int)*size, buf);
+		return (0);
+	}
+
 	/* Add terminal features. */
 	switch (p[0]) {
 	case 61: /* level 1 */
@@ -1513,12 +1519,11 @@ tty_keys_device_attributes2(struct tty *tty, const char *buf, size_t len,
 {
 	struct client	*c = tty->client;
 	int		*features = &c->term_features;
+	int		 have = tty->flags & TTY_HAVEDA2;
 	u_int		 i, n = 0;
 	char		 tmp[128], *endptr, p[32] = { 0 }, *cp, *next;
 
 	*size = 0;
-	if (tty->flags & TTY_HAVEDA2)
-		return (-1);
 
 	/* First three bytes are always \033[>. */
 	if (buf[0] != '\033')
@@ -1559,6 +1564,13 @@ tty_keys_device_attributes2(struct tty *tty, const char *buf, size_t len,
 			break;
 	}
 
+	/* If we already handled DA2, swallow repeats to avoid leaking. */
+	if (have) {
+		log_debug("%s: ignoring repeated secondary DA %.*s", c->name,
+		    (int)*size, buf);
+		return (0);
+	}
+
 	/*
 	 * Add terminal features. We add DECSLRM and DECFRA for some
 	 * identification codes here, notably 64 will catch VT520, even though
@@ -1593,12 +1605,11 @@ tty_keys_extended_device_attributes(struct tty *tty, const char *buf,
 {
 	struct client	*c = tty->client;
 	int		*features = &c->term_features;
+	int		 have = tty->flags & TTY_HAVEXDA;
 	u_int		 i;
 	char		 tmp[128];
 
 	*size = 0;
-	if (tty->flags & TTY_HAVEXDA)
-		return (-1);
 
 	/* First four bytes are always \033P>|. */
 	if (buf[0] != '\033')
@@ -1630,6 +1641,13 @@ tty_keys_extended_device_attributes(struct tty *tty, const char *buf,
 		return (-1);
 	tmp[i - 1] = '\0';
 	*size = 5 + i;
+
+	/* If we already handled XDA, swallow repeats to avoid leaking. */
+	if (have) {
+		log_debug("%s: ignoring repeated extended DA %.*s", c->name,
+		    (int)*size, buf);
+		return (0);
+	}
 
 	/* Add terminal features. */
 	if (strncmp(tmp, "iTerm2 ", 7) == 0)
