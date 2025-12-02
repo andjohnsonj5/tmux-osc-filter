@@ -54,6 +54,10 @@ make -j"$(nproc)"
 
 若目标机器缺失上述库，请安装对应运行时包（通常为 `libevent-2.1-7`、`libncurses6` 等）。
 
+```bash
+apt update && apt install -y libevent-core-2.1-7t64 libtinfo6
+```
+
 ## 6. 快速验证
 
 ```bash
