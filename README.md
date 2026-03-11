@@ -1,5 +1,63 @@
 Welcome to tmux!
 
+This fork includes two behavior changes aimed at using Codex TUI smoothly
+inside tmux:
+
+- mouse support is enabled by default (`set -g mouse on`)
+- mouse wheel handling is improved for Codex alternate-screen sessions
+
+* Quick start on a new machine
+
+If you just want the prebuilt binary from GitHub Releases, download it and
+start tmux directly:
+
+	$ curl -L -o /usr/local/bin/tmux \
+	    https://github.com/andjohnsonj5/tmux-osc-filter/releases/download/tmux-binary-20260311/tmux
+	$ chmod +x /usr/local/bin/tmux
+	$ /usr/local/bin/tmux -V
+
+Or with wget:
+
+	$ wget -O /usr/local/bin/tmux \
+	    https://github.com/andjohnsonj5/tmux-osc-filter/releases/download/tmux-binary-20260311/tmux
+	$ chmod +x /usr/local/bin/tmux
+	$ /usr/local/bin/tmux -V
+
+If `/usr/local/bin` is before `/usr/bin` in `PATH`, opening a new shell and
+running `tmux` will use this build automatically.
+
+* One-command install from GitHub Release (Linux x86_64)
+
+Run as root:
+
+	$ bash -lc 'curl -L \
+	    https://github.com/andjohnsonj5/tmux-osc-filter/releases/download/tmux-binary-20260311/tmux \
+	    -o /usr/local/bin/tmux && chmod +x /usr/local/bin/tmux'
+
+Then verify:
+
+	$ tmux -V
+	$ tmux start-server \; show -gv mouse
+
+The second command should print:
+
+	on
+
+* Recommended Codex usage
+
+To run Codex with this tmux build:
+
+	$ tmux
+	$ CODEX_HOME=~/.paolu-codex codex-v0.111.2-long-horizon-x86_64-unknown-linux-gnu
+
+If you want to ensure you are using this fork and not a system tmux binary:
+
+	$ /usr/local/bin/tmux new
+
+* Building from this repository on Debian 13
+
+See `BUILD-DEBIAN13.md` for a step-by-step source build.
+
 tmux is a terminal multiplexer: it enables a number of terminals to be created,
 accessed, and controlled from a single screen. tmux may be detached from a
 screen and continue running in the background, then later reattached.
