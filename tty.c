@@ -65,6 +65,7 @@ static void	tty_redraw_region(struct tty *, const struct tty_ctx *);
 static void	tty_emulate_repeat(struct tty *, enum tty_code_code,
 		    enum tty_code_code, u_int);
 static void	tty_repeat_space(struct tty *, u_int);
+static void	tty_update_mouse_mode(struct tty *, int);
 static void	tty_draw_pane(struct tty *, const struct tty_ctx *, u_int);
 static void	tty_default_attributes(struct tty *, const struct grid_cell *,
 		    struct colour_palette *, u_int, struct hyperlinks *);
@@ -431,6 +432,7 @@ tty_repeat_requests(struct tty *tty, int force)
 		tty_puts(tty, "\033]10;?\033\\\033]11;?\033\\");
 		tty->flags |= (TTY_WAITBG|TTY_WAITFG);
 	}
+	tty_update_mouse_mode(tty, tty->mode);
 	tty_start_start_timer(tty);
 }
 
@@ -878,22 +880,31 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 	}
 
 	if ((changed & ALL_MOUSE_MODES) && tty_term_has(term, TTYC_KMOUS)) {
-		/*
-		 * If the mouse modes have changed, clear then all and apply
-		 * again. There are differences in how terminals track the
-		 * various bits.
-		 */
-		tty_puts(tty, "\033[?1006l\033[?1000l\033[?1002l\033[?1003l");
-		if (mode & ALL_MOUSE_MODES)
-			tty_puts(tty, "\033[?1006h");
-		if (mode & MODE_MOUSE_ALL)
-			tty_puts(tty, "\033[?1000h\033[?1002h\033[?1003h");
-		else if (mode & MODE_MOUSE_BUTTON)
-			tty_puts(tty, "\033[?1000h\033[?1002h");
-		else if (mode & MODE_MOUSE_STANDARD)
-			tty_puts(tty, "\033[?1000h");
+		tty_update_mouse_mode(tty, mode);
 	}
 	tty->mode = mode;
+}
+
+static void
+tty_update_mouse_mode(struct tty *tty, int mode)
+{
+	if (!tty_term_has(tty->term, TTYC_KMOUS))
+		return;
+
+	/*
+	 * Some terminals can silently drop mouse tracking after a reconnect or
+	 * a long-lived unstable session while tmux still thinks it is enabled.
+	 * Clear and reapply the current mouse private modes to resync state.
+	 */
+	tty_puts(tty, "\033[?1006l\033[?1000l\033[?1002l\033[?1003l");
+	if (mode & ALL_MOUSE_MODES)
+		tty_puts(tty, "\033[?1006h");
+	if (mode & MODE_MOUSE_ALL)
+		tty_puts(tty, "\033[?1000h\033[?1002h\033[?1003h");
+	else if (mode & MODE_MOUSE_BUTTON)
+		tty_puts(tty, "\033[?1000h\033[?1002h");
+	else if (mode & MODE_MOUSE_STANDARD)
+		tty_puts(tty, "\033[?1000h");
 }
 
 static void

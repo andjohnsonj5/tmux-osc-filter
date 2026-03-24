@@ -324,6 +324,7 @@ cmd_refresh_client_exec(struct cmd *self, struct cmdq_item *item)
 		tc->flags |= CLIENT_STATUSFORCE;
 		server_status_client(tc);
 	} else {
+		tty_repeat_requests(tty, 1);
 		tc->flags |= CLIENT_STATUSFORCE;
 		server_redraw_client(tc);
 	}
