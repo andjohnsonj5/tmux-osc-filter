@@ -1866,10 +1866,18 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 
 	payload = start + 3;
 
-	/* Find a terminator: BEL, bare backslash, CR, or LF. */
+	/*
+	 * Find a terminator. Some terminals can leak OSC 10/11/12 replies
+	 * without ST/BEL and immediately continue with the next key sequence.
+	 * If a control byte (including ESC) arrives after a valid colour
+	 * payload, treat it as the beginning of the next key rather than
+	 * waiting forever for a terminator that will never come.
+	 */
 	for (i = payload; i < len && i - payload < sizeof tmp; i++) {
 		if (buf[i] == '\007' || buf[i] == '\\' ||
 		    buf[i] == '\r' || buf[i] == '\n')
+			break;
+		if ((u_char)buf[i] < ' ' || (u_char)buf[i] == '\177')
 			break;
 	}
 	if (i == len)	/* need more data */
@@ -1879,7 +1887,11 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 
 	memcpy(tmp, buf + payload, i - payload);
 	tmp[i - payload] = '\0';
-	*size = i + 1;
+	if (buf[i] == '\007' || buf[i] == '\\' ||
+	    buf[i] == '\r' || buf[i] == '\n')
+		*size = i + 1;
+	else
+		*size = i;
 
 	n = colour_parseX11(tmp);
 	if (n == -1)
