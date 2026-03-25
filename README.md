@@ -1,6 +1,6 @@
 # tmux-osc-filter
 
-Builds run automatically on pushes to `master`, pull requests targeting `master`, manual dispatches, and `tmux-binary-*` tags. Push and pull request builds upload GitHub Actions artifacts. To refresh the downloadable `releases/latest` binaries, create and push a new `tmux-binary-*` tag so GitHub Actions publishes a new GitHub Release and marks it as the latest release. Release binaries are built on Ubuntu 22.04 for better compatibility with systems that do not provide the newer `libtinfo` ABI from Ubuntu 24.04.
+Builds run automatically on pushes to `master`, pull requests targeting `master`, manual dispatches, and `tmux-binary-*` tags. Push and pull request builds upload GitHub Actions artifacts. To refresh the downloadable `releases/latest` binaries, create and push a new `tmux-binary-*` tag so GitHub Actions publishes a new GitHub Release and marks it as the latest release. Release binaries are built on Ubuntu 22.04 for better compatibility with systems that do not provide the newer `libtinfo` ABI from Ubuntu 24.04. Mouse selections still use tmux copy mode by default, but copied text now also falls back to common clipboard tools such as `wl-copy`, `xsel`, `xclip`, `pbcopy`, and `clip.exe` when terminal clipboard integration is unavailable.
 
 Publish a new latest binary release:
 
