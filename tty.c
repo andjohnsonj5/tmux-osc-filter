@@ -432,7 +432,6 @@ tty_repeat_requests(struct tty *tty, int force)
 		tty_puts(tty, "\033]10;?\033\\\033]11;?\033\\");
 		tty->flags |= (TTY_WAITBG|TTY_WAITFG);
 	}
-	tty_update_mouse_mode(tty, tty->mode);
 	tty_start_start_timer(tty);
 }
 
