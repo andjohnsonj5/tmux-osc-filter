@@ -505,7 +505,7 @@ const struct options_table_entry options_table[] = {
 	  .type = OPTIONS_TABLE_CHOICE,
 	  .scope = OPTIONS_TABLE_SERVER,
 	  .choices = options_table_set_clipboard_list,
-	  .default_num = 1,
+	  .default_num = 2,
 	  .text = "Whether to attempt to set the system clipboard ('on' or "
 		  "'external') and whether to allow applications to create "
 		  "paste buffers with an escape sequence ('on' only)."
