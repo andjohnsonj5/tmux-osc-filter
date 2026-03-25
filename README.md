@@ -22,3 +22,26 @@ Install the latest released Ubuntu 22.04-compatible binary:
 ```bash
 curl -L https://github.com/andjohnsonj5/tmux-osc-filter/releases/latest/download/tmux-ubuntu-22.04-x86_64 -o /usr/local/bin/tmux && chmod +x /usr/local/bin/tmux
 ```
+
+Windows Terminal over SSH to Linux running tmux:
+
+- Keep tmux mouse support enabled if you want pane mouse handling and wheel events.
+- In Windows Terminal, enable `copyOnSelect` so terminal-side selections copy to the Windows clipboard automatically.
+- When tmux mouse mode is active, use `Shift` + drag to force Windows Terminal text selection instead of sending the drag to tmux.
+- tmux copies still try terminal clipboard integration first, then fall back to common clipboard commands.
+
+Windows Terminal `settings.json` example:
+
+```json
+{
+  "copyOnSelect": true
+}
+```
+
+Recommended tmux config for this scenario:
+
+```tmux
+set -g mouse on
+set -s set-clipboard on
+set -as terminal-features ',xterm-256color:clipboard'
+```
