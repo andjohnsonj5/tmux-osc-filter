@@ -315,21 +315,7 @@ const struct options_table_entry options_table[] = {
 	{ .name = "copy-command",
 	  .type = OPTIONS_TABLE_STRING,
 	  .scope = OPTIONS_TABLE_SERVER,
-	  .default_str = "sh -c '"
-			 "if command -v wl-copy >/dev/null 2>&1; then "
-			 "exec wl-copy; "
-			 "elif command -v xsel >/dev/null 2>&1; then "
-			 "exec xsel -i --clipboard; "
-			 "elif command -v xclip >/dev/null 2>&1; then "
-			 "exec xclip -selection clipboard -in; "
-			 "elif command -v pbcopy >/dev/null 2>&1; then "
-			 "exec pbcopy; "
-			 "elif command -v clip.exe >/dev/null 2>&1; then "
-			 "exec clip.exe; "
-			 "elif command -v clip >/dev/null 2>&1; then "
-			 "exec clip; "
-			 "else exec cat >/dev/null; "
-			 "fi'",
+	  .default_str = "",
 	  .text = "Shell command run when text is copied. "
 		  "If empty, no command is run."
 	},
@@ -505,7 +491,7 @@ const struct options_table_entry options_table[] = {
 	  .type = OPTIONS_TABLE_CHOICE,
 	  .scope = OPTIONS_TABLE_SERVER,
 	  .choices = options_table_set_clipboard_list,
-	  .default_num = 2,
+	  .default_num = 1,
 	  .text = "Whether to attempt to set the system clipboard ('on' or "
 		  "'external') and whether to allow applications to create "
 		  "paste buffers with an escape sequence ('on' only)."
