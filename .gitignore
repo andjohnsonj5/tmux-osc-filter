@@ -18,6 +18,7 @@ config.status
 configure
 core
 etc/
+dist/
 fuzz/*-fuzzer
 tags
 tmux
