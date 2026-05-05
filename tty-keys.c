@@ -1708,25 +1708,51 @@ tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
 	if (len == 5)
 		return (1);
 
-	/* Copy the rest up to \033\ or \007. */
+	/*
+	 * Copy the rest up to \033\ or \007. If a colour reply is missing its
+	 * terminator and another control sequence has already arrived, stop at
+	 * that control byte and leave it for the next key parse.
+	 */
 	for (i = 0; i < (sizeof tmp) - 1; i++) {
 		if (5 + i == len)
 			return (1);
-		if (buf[5 + i - 1] == '\033' && buf[5 + i] == '\\')
-			break;
 		if (buf[5 + i] == '\007')
 			break;
+		if (buf[5 + i] == '\033') {
+			if (5 + i + 1 == len)
+				return (1);
+			if (buf[5 + i + 1] == '\\')
+				break;
+			if (i == 0)
+				return (-1);
+			break;
+		}
+		if ((u_char)buf[5 + i] < ' ' || (u_char)buf[5 + i] == '\177') {
+			if (i == 0)
+				return (-1);
+			break;
+		}
 		tmp[i] = buf[5 + i];
 	}
 	if (i == (sizeof tmp) - 1)
+		return (-1);
+	if (i == 0)
 		return (-1);
 	if (tmp[i - 1] == '\033')
 		tmp[i - 1] = '\0';
 	else
 		tmp[i] = '\0';
-	*size = 6 + i;
-
 	n = colour_parseX11(tmp);
+	if (n == -1)
+		return (-1);
+
+	if (buf[5 + i] == '\007')
+		*size = 6 + i;
+	else if (buf[5 + i] == '\033' && buf[5 + i + 1] == '\\')
+		*size = 7 + i;
+	else
+		*size = 5 + i;
+
 	if (n != -1 && buf[3] == '0') {
 		if (c != NULL)
 			log_debug("%s fg is %s", c->name, colour_tostring(n));
@@ -1866,10 +1892,18 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 
 	payload = start + 3;
 
-	/* Find a terminator: BEL, bare backslash, CR, or LF. */
+	/*
+	 * Find a terminator. Some terminals can leak OSC 10/11/12 replies
+	 * without ST/BEL and immediately continue with the next key sequence.
+	 * If a control byte (including ESC) arrives after a valid colour
+	 * payload, treat it as the beginning of the next key rather than
+	 * waiting for a terminator that will never come.
+	 */
 	for (i = payload; i < len && i - payload < sizeof tmp; i++) {
 		if (buf[i] == '\007' || buf[i] == '\\' ||
 		    buf[i] == '\r' || buf[i] == '\n')
+			break;
+		if ((u_char)buf[i] < ' ' || (u_char)buf[i] == '\177')
 			break;
 	}
 	if (i == len)	/* need more data */
@@ -1879,7 +1913,11 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 
 	memcpy(tmp, buf + payload, i - payload);
 	tmp[i - payload] = '\0';
-	*size = i + 1;
+	if (buf[i] == '\007' || buf[i] == '\\' ||
+	    buf[i] == '\r' || buf[i] == '\n')
+		*size = i + 1;
+	else
+		*size = i;
 
 	n = colour_parseX11(tmp);
 	if (n == -1)

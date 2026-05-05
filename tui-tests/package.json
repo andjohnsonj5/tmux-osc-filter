@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tui-test"
+  },
+  "devDependencies": {
+    "@microsoft/tui-test": "0.0.4"
+  }
+}
