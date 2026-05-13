@@ -13,13 +13,3 @@ Verify:
 ```bash
 tmux -V
 ```
-
-Windows Terminal selection:
-
-This build leaves tmux mouse mode off by default so Windows Terminal native
-drag selection and right-click copy keep working. If you prefer tmux mouse
-selection, panes, and wheel handling, add this to `~/.tmux.conf`:
-
-```tmux
-set -g mouse on
-```
