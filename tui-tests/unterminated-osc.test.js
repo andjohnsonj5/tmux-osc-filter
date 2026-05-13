@@ -58,3 +58,24 @@ test("unterminated OSC colour reply does not block following keys", async ({ ter
   if (!await waitFor(() => clientCount() === 0))
     throw new Error("tmux did not process C-b d after an unterminated OSC colour reply");
 });
+
+test("complete OSC colour value without terminator releases printable input", async ({ terminal }) => {
+  await expect(terminal.getByText("ready", { full: true })).toBeVisible();
+  await waitFor(hasSession);
+  await waitFor(() => clientCount() === 1);
+
+  terminal.write("\x1b]10;rgb:aaaa/bbbb/ccccd");
+
+  await expect(terminal.getByText("readyd", { full: true })).toBeVisible();
+});
+
+test("complete OSC colour value without terminator does not wait forever", async ({ terminal }) => {
+  await expect(terminal.getByText("ready", { full: true })).toBeVisible();
+  await waitFor(hasSession);
+  await waitFor(() => clientCount() === 1);
+
+  terminal.write("\x1b]10;rgb:aaaa/bbbb/cccc");
+  terminal.write("d");
+
+  await expect(terminal.getByText("readyd", { full: true })).toBeVisible();
+});

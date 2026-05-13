@@ -62,6 +62,7 @@ static int	tty_keys_extended_device_attributes(struct tty *, const char *,
 static int	tty_keys_palette(struct tty *, const char *, size_t, size_t *);
 static int	tty_keys_broken_colours(struct tty *, const char *, size_t,
 		    size_t *, int *, int *);
+static int	tty_keys_colour_payload_complete(const char *, size_t);
 
 /* A key tree entry. */
 struct tty_key {
@@ -1675,6 +1676,45 @@ tty_keys_extended_device_attributes(struct tty *tty, const char *buf,
  * Handle foreground or background input. Returns 0 for success, -1 for
  * failure, 1 for partial.
  */
+static int
+tty_keys_colour_payload_complete(const char *buf, size_t len)
+{
+	size_t	i;
+
+	if (len == 12 && strncmp(buf, "rgb:", 4) == 0 &&
+	    isxdigit((u_char)buf[4]) && isxdigit((u_char)buf[5]) &&
+	    buf[6] == '/' &&
+	    isxdigit((u_char)buf[7]) && isxdigit((u_char)buf[8]) &&
+	    buf[9] == '/' &&
+	    isxdigit((u_char)buf[10]) && isxdigit((u_char)buf[11]))
+		return (1);
+	if (len == 18 && strncmp(buf, "rgb:", 4) == 0 &&
+	    buf[8] == '/' && buf[13] == '/') {
+		for (i = 4; i < 18; i++) {
+			if (i == 8 || i == 13)
+				continue;
+			if (!isxdigit((u_char)buf[i]))
+				return (0);
+		}
+		return (1);
+	}
+	if (len == 7 && buf[0] == '#') {
+		for (i = 1; i < 7; i++) {
+			if (!isxdigit((u_char)buf[i]))
+				return (0);
+		}
+		return (1);
+	}
+	if (len == 13 && buf[0] == '#') {
+		for (i = 1; i < 13; i++) {
+			if (!isxdigit((u_char)buf[i]))
+				return (0);
+		}
+		return (1);
+	}
+	return (0);
+}
+
 int
 tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
     int *fg, int *bg)
@@ -1714,6 +1754,8 @@ tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
 	 * that control byte and leave it for the next key parse.
 	 */
 	for (i = 0; i < (sizeof tmp) - 1; i++) {
+		if (tty_keys_colour_payload_complete(buf + 5, i))
+			break;
 		if (5 + i == len)
 			return (1);
 		if (buf[5 + i] == '\007')
@@ -1746,9 +1788,10 @@ tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
 	if (n == -1)
 		return (-1);
 
-	if (buf[5 + i] == '\007')
+	if (5 + i < len && buf[5 + i] == '\007')
 		*size = 6 + i;
-	else if (buf[5 + i] == '\033' && buf[5 + i + 1] == '\\')
+	else if (5 + i + 1 < len && buf[5 + i] == '\033' &&
+	    buf[5 + i + 1] == '\\')
 		*size = 7 + i;
 	else
 		*size = 5 + i;
@@ -1900,21 +1943,25 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 	 * waiting for a terminator that will never come.
 	 */
 	for (i = payload; i < len && i - payload < sizeof tmp; i++) {
+		if (tty_keys_colour_payload_complete(buf + payload, i - payload))
+			break;
 		if (buf[i] == '\007' || buf[i] == '\\' ||
 		    buf[i] == '\r' || buf[i] == '\n')
 			break;
 		if ((u_char)buf[i] < ' ' || (u_char)buf[i] == '\177')
 			break;
 	}
-	if (i == len)	/* need more data */
+	if (i == len &&
+	    !tty_keys_colour_payload_complete(buf + payload, i - payload))
+		/* need more data */
 		return (1);
 	if (i == payload) /* empty colour */
 		return (-1);
 
 	memcpy(tmp, buf + payload, i - payload);
 	tmp[i - payload] = '\0';
-	if (buf[i] == '\007' || buf[i] == '\\' ||
-	    buf[i] == '\r' || buf[i] == '\n')
+	if (i < len && (buf[i] == '\007' || buf[i] == '\\' ||
+	    buf[i] == '\r' || buf[i] == '\n'))
 		*size = i + 1;
 	else
 		*size = i;
