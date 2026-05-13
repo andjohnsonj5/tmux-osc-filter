@@ -1,0 +1,90 @@
+name: Build binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish this build as the latest GitHub Release"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - dev
+    tags:
+      - "tmux-binary-*"
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-x86_64:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake libtool pkg-config \
+            libevent-dev libncurses-dev bison build-essential
+
+      - name: Build tmux
+        run: |
+          ./autogen.sh
+          ./configure
+          make -j"$(nproc)"
+
+      - name: Smoke test binary
+        run: |
+          ./tmux -V
+          ldd ./tmux
+
+      - name: Prepare binary assets
+        run: |
+          cp tmux tmux-linux-x86_64
+          sha256sum tmux tmux-linux-x86_64 > SHA256SUMS
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmux-linux-x86_64
+          path: |
+            tmux
+            tmux-linux-x86_64
+            SHA256SUMS
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          make_latest: true
+          generate_release_notes: true
+          overwrite_files: true
+          files: |
+            tmux
+            tmux-linux-x86_64
+            SHA256SUMS
+
+      - name: Publish manual release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: tmux-binary-${{ github.run_number }}
+          tag_name: tmux-binary-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          generate_release_notes: true
+          overwrite_files: true
+          files: |
+            tmux
+            tmux-linux-x86_64
+            SHA256SUMS
