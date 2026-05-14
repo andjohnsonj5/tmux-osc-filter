@@ -1715,6 +1715,22 @@ tty_keys_colour_payload_complete(const char *buf, size_t len)
 	return (0);
 }
 
+static int
+tty_keys_colour_terminator_size(const char *buf, size_t len, size_t off)
+{
+	if (off >= len)
+		return (0);
+	if (buf[off] == '\007')
+		return (1);
+	if (buf[off] == '\033') {
+		if (off + 1 >= len)
+			return (0);
+		if (buf[off + 1] == '\\')
+			return (2);
+	}
+	return (0);
+}
+
 int
 tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
     int *fg, int *bg)
@@ -1754,8 +1770,12 @@ tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
 	 * that control byte and leave it for the next key parse.
 	 */
 	for (i = 0; i < (sizeof tmp) - 1; i++) {
-		if (tty_keys_colour_payload_complete(buf + 5, i))
+		if (tty_keys_colour_payload_complete(buf + 5, i)) {
+			if (5 + i < len && buf[5 + i] == '\033' &&
+			    5 + i + 1 == len)
+				return (1);
 			break;
+		}
 		if (5 + i == len)
 			return (1);
 		if (buf[5 + i] == '\007')
@@ -1788,13 +1808,7 @@ tty_keys_colours(struct tty *tty, const char *buf, size_t len, size_t *size,
 	if (n == -1)
 		return (-1);
 
-	if (5 + i < len && buf[5 + i] == '\007')
-		*size = 6 + i;
-	else if (5 + i + 1 < len && buf[5 + i] == '\033' &&
-	    buf[5 + i + 1] == '\\')
-		*size = 7 + i;
-	else
-		*size = 5 + i;
+	*size = 5 + i + tty_keys_colour_terminator_size(buf, len, 5 + i);
 
 	if (n != -1 && buf[3] == '0') {
 		if (c != NULL)
@@ -1943,8 +1957,11 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 	 * waiting for a terminator that will never come.
 	 */
 	for (i = payload; i < len && i - payload < sizeof tmp; i++) {
-		if (tty_keys_colour_payload_complete(buf + payload, i - payload))
+		if (tty_keys_colour_payload_complete(buf + payload, i - payload)) {
+			if (i < len && buf[i] == '\033' && i + 1 == len)
+				return (1);
 			break;
+		}
 		if (buf[i] == '\007' || buf[i] == '\\' ||
 		    buf[i] == '\r' || buf[i] == '\n')
 			break;
@@ -1960,11 +1977,10 @@ tty_keys_broken_colours(struct tty *tty, const char *buf, size_t len,
 
 	memcpy(tmp, buf + payload, i - payload);
 	tmp[i - payload] = '\0';
-	if (i < len && (buf[i] == '\007' || buf[i] == '\\' ||
-	    buf[i] == '\r' || buf[i] == '\n'))
+	*size = i + tty_keys_colour_terminator_size(buf, len, i);
+	if (*size == i && i < len &&
+	    (buf[i] == '\\' || buf[i] == '\r' || buf[i] == '\n'))
 		*size = i + 1;
-	else
-		*size = i;
 
 	n = colour_parseX11(tmp);
 	if (n == -1)

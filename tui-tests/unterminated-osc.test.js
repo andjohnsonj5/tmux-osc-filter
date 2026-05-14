@@ -59,6 +59,29 @@ test("unterminated OSC colour reply does not block following keys", async ({ ter
     throw new Error("tmux did not process C-b d after an unterminated OSC colour reply");
 });
 
+test("terminated OSC colour reply consumes ST before prefix key", async ({ terminal }) => {
+  await expect(terminal.getByText("ready", { full: true })).toBeVisible();
+  await waitFor(hasSession);
+  await waitFor(() => clientCount() === 1);
+
+  terminal.write("\x1b]10;rgb:aaaa/bbbb/cccc\x1b\\\x02d");
+
+  if (!await waitFor(() => clientCount() === 0))
+    throw new Error("tmux did not process C-b d after a terminated OSC colour reply");
+});
+
+test("split OSC colour ST does not leave ESC before prefix key", async ({ terminal }) => {
+  await expect(terminal.getByText("ready", { full: true })).toBeVisible();
+  await waitFor(hasSession);
+  await waitFor(() => clientCount() === 1);
+
+  terminal.write("\x1b]10;rgb:aaaa/bbbb/cccc\x1b");
+  terminal.write("\\\x02d");
+
+  if (!await waitFor(() => clientCount() === 0))
+    throw new Error("tmux did not process C-b d after a split OSC colour ST");
+});
+
 test("complete OSC colour value without terminator releases printable input", async ({ terminal }) => {
   await expect(terminal.getByText("ready", { full: true })).toBeVisible();
   await waitFor(hasSession);
